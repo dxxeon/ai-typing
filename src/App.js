@@ -12,7 +12,9 @@ function App() {
         <Route path="/game" element={<Game />} />
         <Route path="/scoreboard" element={<Scoreboard />} />
       </Routes>
+      <Analytics />
     </BrowserRouter>
+    
   );
 }
 
