@@ -11,3 +11,21 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+body {
+  cursor: url('../public/images/cursor-base.png'), default !important;
+}
+
+/* 2. 클릭 가능한 모든 요소(버튼, 링크, 탭 등)에 올렸을 때 */
+a, button, select, [role="button"], input[type="button"], input[type="submit"], .tab, .activeTab {
+  cursor: url('../public/images/cursor-click.png'), pointer !important;
+}
+
+/* 3. (선택) 입력창 위에서는 텍스트 커서 유지하거나 다른 이미지 지정 */
+input[type="text"], textarea {
+  cursor: url('../public/images/cursor-text.png') 0 0 !important;
+}
+
+input[type="text"]:focus, textarea:focus {
+  cursor: url('../public/images/cursor-text.png'), text !important;
+}

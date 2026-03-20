@@ -39,17 +39,30 @@ function Scoreboard() {
 
     const q = query(
       collection(db, "rankings"),
-      where("setId", "==", currentTab),
-      orderBy("speed", "desc"),
-      orderBy("accuracy", "desc")
+      where("setId", "==", currentTab)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setRankings(data);
+      const data = snapshot.docs.map(doc => {
+        const item = doc.data();
+        
+        // 🎯 [조정 점수 계산] 정확도가 낮을수록 점수가 크게 깎임
+        // 정확도 60% 미만은 점수를 0으로 처리해서 맨 아래로 보냄
+        const calculatedScore = item.accuracy < 60 
+          ? 0 
+          : (item.speed || 0) * Math.pow((item.accuracy || 0) / 100, 2);
+
+        return {
+          id: doc.id,
+          ...item,
+          adjustedScore: calculatedScore
+        };
+      });
+
+      // 3. 조정 점수(adjustedScore) 기준으로 내림차순 정렬
+      const sortedData = data.sort((a, b) => b.adjustedScore - a.adjustedScore);
+      
+      setRankings(sortedData);
     });
 
     return () => unsubscribe();
@@ -102,22 +115,25 @@ function Scoreboard() {
         </thead>
 
         <tbody>
-          {rankings.map((r, i) => (
-            <tr
-              key={r.id}
-              style={{
-                ...styles.tr,
-                ...(i === 0 ? styles.first : {})
-              }}
-            >
-              <td>{i + 1}</td>
-              <td>{r.name || "익명"}</td>
-              <td>{r.group || "무소속"}</td>
-              <td>{Math.round(r.speed || 0)}</td>
-              <td>{r.accuracy ? r.accuracy.toFixed(1) : "0.0"}%</td>
-              <td style={styles.timeCell}>{formatDateTime(r.timestamp || r.createdAt)}</td>
-            </tr>
-          ))}
+          {rankings.map((r, i) => {
+            const isValidScore = (r.accuracy >= 60) && (r.speed > 0);
+    
+            return (
+              <tr
+                key={r.id}
+                style={{
+                  ...styles.tr,
+                  ...(i === 0 && isValidScore ? styles.first : {})
+                }}>
+                <td>{isValidScore ? i + 1 : "-"}</td>
+                <td>{r.name || "익명"}</td>
+                <td>{r.group || "무소속"}</td>
+                <td>{Math.round(r.speed || 0)}</td>
+                <td>{r.accuracy ? r.accuracy.toFixed(1) : "0.0"}%</td>
+                <td style={styles.timeCell}>{formatDateTime(r.timestamp || r.createdAt)}</td>
+             </tr>
+    );
+  })}
         </tbody>
       </table>
 

@@ -59,7 +59,7 @@ function Home() {
           <select 
             value={setId} 
             onChange={(e) => setSetId(e.target.value)}
-            style={{...styles.select, border: "2px solid #007bff"}}
+            style={{...styles.select, border: "2px solid #c36fff"}}
           >
             <option value="" style={{color: "#888"}}>세트 선택</option>
             <option value="set1">애국가 (1~4절)</option>

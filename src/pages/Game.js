@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import Footer from "../components/Footer";
 
 import {db} from "../firebase";
-import {collection, addDoc, serverTimestamp} from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, getDocs, query, where, orderBy } from "firebase/firestore";
 
 const lineSets = {
   set1: ["동해물과 백두산이 마르고 닳도록",
@@ -66,16 +66,20 @@ function Game() {
   const [speed, setSpeed] = useState(0);
   const [accuracy, setAccuracy] = useState(100);
 
+  const [myRank, setMyRank] = useState("-");
+
   const inputRef = useRef(null);
 
   // firebase score 저장 함수
-  const saveScore = async (speed, accuracy) => {
+  const saveScore = async (rawSpeed, finalAcc) => {
+    const adjustedScore = rawSpeed * Math.pow(finalAcc / 100, 2);
     try {
       await addDoc(collection(db, "rankings"), {
         name: name || "none",
         group: group || "none",
-        speed: Math.round(speed),
-        accuracy: Number(accuracy.toFixed(1)),
+        speed: Math.round(rawSpeed),
+        accuracy: Number(finalAcc.toFixed(1)),
+        score: Math.round(adjustedScore),
         setId: setId || "set1",
         timestamp: serverTimestamp()
       });
@@ -113,9 +117,36 @@ function Game() {
     setAccuracy(acc);
   };
 
+  const calculateRank = async (finalSpeed, finalAcc) => {
+    if (finalAcc < 60) {
+      setMyRank("-");
+      return;
+    }
+    try {
+      const q = query(
+        collection(db, "rankings"),
+        where("setId", "==", setId),
+        orderBy("speed", "desc"),
+        orderBy("accuracy", "desc")
+      );
+      const querySnapshot = await getDocs(q);
+      const allRankings = querySnapshot.docs.map(doc => doc.data());
+      // 내 점수보다 잘한 사람 수 + 1
+      const rank = allRankings.findIndex(r => r.speed <= finalSpeed && r.accuracy <= finalAcc);
+      setMyRank(rank === -1 ? allRankings.length : rank + 1);
+    } catch (e) {
+      setMyRank("-");
+    }
+  };
+
   // -----------------------------
   // 이벤트 핸들러
   // -----------------------------
+  const preventCopyPaste = (e) => {
+    e.preventDefault();
+    alert("복붙 금지! 직접 입력해 주세요.");
+  };
+  
   const handleInputChange = (e) => {
     if (isFinished) return;
     const val = e.target.value;
@@ -130,40 +161,63 @@ function Game() {
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      
-      const currentInputJamo = splitString(input);
-      const currentTargetJamo = splitString(lines[currentLine]);
-      
-      let lineErrors = 0;
-      currentInputJamo.forEach((jamo, i) => {
-        if (jamo !== currentTargetJamo[i]) lineErrors++;
-      });
+  if (e.key === "Enter") {
+    e.preventDefault();
 
-      const nextJamoCount = accJamoCount + currentInputJamo.length;
-      const nextErrors = accErrors + lineErrors;
+    // 1. 현재 쳐야 할 문장과 입력한 문장을 자모 단위로 분해
+    const currentTargetJamo = splitString(lines[currentLine] || "");
+    const currentInputJamo = splitString(input);
 
-      if (currentLine === lines.length - 1) {
-        const endTime = Date.now();
-        const totalTimeSeconds = (endTime - startTime) / 1000;
-        setFinalElapsed(totalTimeSeconds);
-        
-        // 최종 결과 고정
-        const finalMinutes = Math.max(totalTimeSeconds / 60, 0.001);
-        setSpeed(nextJamoCount / finalMinutes);
-        setAccuracy(((nextJamoCount - nextErrors) / nextJamoCount) * 100);
-        
-        setIsFinished(true);
-        saveScore(speed, accuracy);
-      } else {
-        setAccJamoCount(nextJamoCount);
-        setAccErrors(nextErrors);
-        setCurrentLine(prev => prev + 1);
-        setInput("");
+    let lineErrors = 0;
+
+    // 2. 빈 입력인 경우: 해당 문장의 모든 자모를 에러로 처리
+    if (input.trim().length === 0) {
+      lineErrors = currentTargetJamo.length;
+    } else {
+      // 3. 내용이 있는 경우: 대상 문장과 입력 문장 중 더 긴 것을 기준으로 비교
+      // (이렇게 해야 문장을 다 안 채우고 엔터 쳤을 때 남은 글자들이 오답 처리됨)
+      const maxLength = Math.max(currentTargetJamo.length, currentInputJamo.length);
+      for (let i = 0; i < maxLength; i++) {
+        if (currentInputJamo[i] !== currentTargetJamo[i]) {
+          lineErrors++;
+        }
       }
     }
-  };
+
+    // 4. 누적 데이터 계산 (빈 입력 시에는 대상 문장의 길이를 더해줌)
+    const nextJamoCount = accJamoCount + (input.length === 0 ? currentTargetJamo.length : currentInputJamo.length);
+    const nextErrors = accErrors + lineErrors;
+
+    if (currentLine === lines.length - 1) {
+      // 마지막 줄인 경우 게임 종료 처리
+      const endTime = Date.now();
+      const totalTimeSeconds = (endTime - (startTime || endTime)) / 1000;
+      setFinalElapsed(totalTimeSeconds);
+
+      const finalMinutes = Math.max(totalTimeSeconds / 60, 0.001);
+      const rawSpeed = nextJamoCount / finalMinutes;
+      const finalAcc = ((nextJamoCount - nextErrors) / nextJamoCount) * 100;
+
+      const adjustedSpeed = rawSpeed * Math.pow(finalAcc / 100, 2);
+
+      // 상태 업데이트
+      setSpeed(rawSpeed);
+      setAccuracy(finalAcc);
+      setIsFinished(true);
+
+      // 💡 중요: 비동기 업데이트를 기다리지 않고 계산된 최종값으로 바로 저장
+      saveScore(adjustedSpeed, finalAcc).then(() => {
+          calculateRank(adjustedSpeed, finalAcc);
+      });
+    } else {
+      // 다음 줄로 이동
+      setAccJamoCount(nextJamoCount);
+      setAccErrors(nextErrors);
+      setCurrentLine(prev => prev + 1);
+      setInput("");
+    }
+  }
+};
 
   const formatTime = (seconds) => {
     const m = Math.floor(seconds / 60);
@@ -204,6 +258,8 @@ function Game() {
             value={input}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
+            onPaste={preventCopyPaste}
+            onContextMenu={(e) => e.preventDefault()}
             style={styles.hiddenInput}
             autoFocus
           />
@@ -222,16 +278,17 @@ function Game() {
       {isFinished && (
         <div style={styles.modalOverlay}>
           <div style={styles.modal}>
-            <h2 style={{textAlign: 'center'}}>게임 종료</h2>
+            <h2 style={{textAlign: 'center', fontFamily: 'Galmuri11'}}>게임 종료</h2>
             <div style={styles.resultRow}><span>닉네임</span> <b>{name}</b></div>
             <div style={styles.resultRow}><span>소속 학과</span> <b>{group}</b></div>
-            <div style={styles.resultRow}><span>최종 타수</span> <b style={{color: '#007bff'}}>{Math.round(speed)}</b></div>
-            <div style={styles.resultRow}><span>최종 정확도</span> <b style={{color: '#28a745'}}>{accuracy.toFixed(1)}%</b></div>
-            <div style={styles.resultRow}><span>소요 시간</span> <b style={{color: '#28a745'}}>{formatTime(finalElapsed)}</b></div>
+            <div style={styles.resultRow}><span>최종 타수</span> <b style={{color: '#c36fff'}}>{Math.round(speed)}</b></div>
+            <div style={styles.resultRow}><span>최종 정확도</span> <b style={{color: '#c36fff'}}>{accuracy.toFixed(1)}%</b></div>
+            <div style={styles.resultRow}><span>소요 시간</span> <b style={{color: 'black'}}>{formatTime(finalElapsed)}</b></div>
+            <div style={styles.rankHighlight}><span>내 순위</span><b>{myRank} 위</b></div>
             <div style={styles.btnGroup}>
-              <button onClick={() => window.location.reload()} style={styles.btn}>다시 하기</button>
-              <button onClick={() => navigate("/")} style={{...styles.btn, backgroundColor: "#6c757d"}}>홈</button>
-              <button onClick={() => navigate("/scoreboard")} style={{...styles.btn, backgroundColor: "#28a745"}}>스코어보드</button>
+              <button onClick={() => window.location.reload()} style={{...styles.btn, fontFamily: 'Galmuri11'}}>다시 하기</button>
+              <button onClick={() => navigate("/")} style={{...styles.btn, fontFamily: 'Galmuri11', backgroundColor: "#6c757d"}}>홈</button>
+              <button onClick={() => navigate("/scoreboard")} style={{...styles.btn, fontFamily: 'Galmuri11', backgroundColor: "#c36fff"}}>스코어보드</button>
 </div>
           </div>
         </div>
@@ -267,8 +324,17 @@ const styles = {
   modalOverlay: { position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.7)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1000 },
   modal: { backgroundColor: "white", padding: "40px", borderRadius: "20px", width: "320px", boxShadow: "0 20px 40px rgba(0,0,0,0.3)", fontFamily: 'Galmuri9' },
   resultRow: { display: "flex", justifyContent: "space-between", margin: "15px 0", fontSize: "18px", borderBottom: "1px solid #f5f5f5", paddingBottom: "5px" },
-  btnGroup: {display: "flex", gap: "10px", marginTop: "20px"},
-  btn: {flex: 1, padding: "12px", backgroundColor: "#007bff", color: "white", border: "none", borderRadius: "10px", cursor: "pointer", fontSize: "14px", fontWeight: "bold"}
+  btnGroup: {display: "flex", gap: "10px", marginTop: "20px", fontFamily: 'Galmuri11'},
+  btn: {flex: 1, padding: "12px", backgroundColor: "#c36fff", color: "white", border: "none", borderRadius: "10px", cursor: "pointer", fontSize: "14px", fontWeight: "bold"},
+  rankHighlight: {
+    backgroundColor: "#fff176", padding: "5px",
+    display: "flex", justifyContent: "space-between", margin: "10px 0", fontSize: "18px", borderBottom: "1px solid #f5f5f5",
+  },
+  // rankValue: {
+  //   color: "#d32f2f",
+  //   fontSize: "26px",
+  //   margin: "0 5px"
+  // },
 };
 
 export default Game;
