@@ -46,11 +46,9 @@ function Scoreboard() {
       const data = snapshot.docs.map(doc => {
         const item = doc.data();
         
-        // 🎯 [조정 점수 계산] 정확도가 낮을수록 점수가 크게 깎임
-        // 정확도 60% 미만은 점수를 0으로 처리해서 맨 아래로 보냄
         const calculatedScore = item.accuracy < 60 
           ? 0 
-          : (item.speed || 0) * Math.pow((item.accuracy || 0) / 100, 2);
+          : (item.speed || 0) * Math.pow((item.accuracy || 0) / 100, 1.3);
 
         return {
           id: doc.id,
@@ -59,7 +57,6 @@ function Scoreboard() {
         };
       });
 
-      // 3. 조정 점수(adjustedScore) 기준으로 내림차순 정렬
       const sortedData = data.sort((a, b) => b.adjustedScore - a.adjustedScore);
       
       setRankings(sortedData);

@@ -72,7 +72,7 @@ function Game() {
 
   // firebase score 저장 함수
   const saveScore = async (rawSpeed, finalAcc) => {
-    const adjustedScore = rawSpeed * Math.pow(finalAcc / 100, 2);
+    const adjustedScore = rawSpeed * Math.pow(finalAcc / 100, 1.3);
     try {
       await addDoc(collection(db, "rankings"), {
         name: name || "none",
@@ -122,19 +122,28 @@ function Game() {
       setMyRank("-");
       return;
     }
+
+    // 조정 타수(내 점수) 계산
+    const myScore = Math.round(finalSpeed * Math.pow(finalAcc / 100, 1.3));
+
     try {
       const q = query(
         collection(db, "rankings"),
         where("setId", "==", setId),
-        orderBy("speed", "desc"),
-        orderBy("accuracy", "desc")
+        orderBy("score", "desc") // 타수/정확도 따로가 아닌 'score'로 정렬
       );
+      
       const querySnapshot = await getDocs(q);
       const allRankings = querySnapshot.docs.map(doc => doc.data());
-      // 내 점수보다 잘한 사람 수 + 1
-      const rank = allRankings.findIndex(r => r.speed <= finalSpeed && r.accuracy <= finalAcc);
-      setMyRank(rank === -1 ? allRankings.length : rank + 1);
+      
+      // 내 점수(myScore)보다 높은 점수를 가진 사람의 수를 찾음
+      // findIndex는 0부터 시작하므로 +1을 해줍니다.
+      const index = allRankings.findIndex(r => (r.score || 0) <= myScore);
+      
+      // 만약 내 점수가 꼴찌보다 낮으면 전체 인원수 + 1
+      setMyRank(index === -1 ? allRankings.length + 1 : index + 1);
     } catch (e) {
+      console.error("등수 계산 오류:", e);
       setMyRank("-");
     }
   };
