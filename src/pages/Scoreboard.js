@@ -72,7 +72,7 @@ function Scoreboard() {
       </div>
 
       <h1 style={styles.title}>
-        <img src='/images/rankings.png' alt="랭킹-타이틀" style={styles.titleImg} />
+        <img src='/images/rankings.png' alt="랭킹-타이틀" style={styles.rankImg} />
       </h1>
 
       <div style={styles.topBtnGroup}>
@@ -161,6 +161,12 @@ const styles = {
   },
   titleImg: {
     width: "450px",
+    height: "auto",
+    display: "block",
+    margin: "0 auto",
+  },
+  rankImg: {
+    width: "350px",
     height: "auto",
     display: "block",
     margin: "0 auto",

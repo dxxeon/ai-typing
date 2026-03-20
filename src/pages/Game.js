@@ -70,6 +70,10 @@ function Game() {
 
   const inputRef = useRef(null);
 
+  const setNames = {
+    set1: "애국가", set2: "인공지능대학", set3: "이누공"
+  }
+
   // firebase score 저장 함수
   const saveScore = async (rawSpeed, finalAcc) => {
     const adjustedScore = rawSpeed * Math.pow(finalAcc / 100, 1.3);
@@ -293,6 +297,7 @@ function Game() {
             <div style={styles.resultRow}><span>최종 타수</span> <b style={{color: '#c36fff'}}>{Math.round(speed)}</b></div>
             <div style={styles.resultRow}><span>최종 정확도</span> <b style={{color: '#c36fff'}}>{accuracy.toFixed(1)}%</b></div>
             <div style={styles.resultRow}><span>소요 시간</span> <b style={{color: 'black'}}>{formatTime(finalElapsed)}</b></div>
+            <div style={styles.resultRow}> <span>세트</span> <b>{setNames[setId] || "세트명"}</b> </div>
             <div style={styles.rankHighlight}><span>내 순위</span><b>{myRank} 위</b></div>
             <div style={styles.btnGroup}>
               <button onClick={() => window.location.reload()} style={{...styles.btn, fontFamily: 'Galmuri11'}}>다시 하기</button>
