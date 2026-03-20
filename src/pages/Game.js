@@ -207,7 +207,7 @@ function Game() {
       const rawSpeed = nextJamoCount / finalMinutes;
       const finalAcc = ((nextJamoCount - nextErrors) / nextJamoCount) * 100;
 
-      const adjustedSpeed = rawSpeed * Math.pow(finalAcc / 100, 2);
+      const adjustedSpeed = rawSpeed * Math.pow(finalAcc / 100, 1.3);
 
       // 상태 업데이트
       setSpeed(rawSpeed);
@@ -215,8 +215,8 @@ function Game() {
       setIsFinished(true);
 
       // 💡 중요: 비동기 업데이트를 기다리지 않고 계산된 최종값으로 바로 저장
-      saveScore(adjustedSpeed, finalAcc).then(() => {
-          calculateRank(adjustedSpeed, finalAcc);
+      saveScore(rawSpeed, finalAcc).then(() => {
+          calculateRank(rawSpeed, finalAcc);
       });
     } else {
       // 다음 줄로 이동
