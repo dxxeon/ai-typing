@@ -62,9 +62,9 @@ function Home() {
             style={{...styles.select, border: "2px solid #c36fff"}}
           >
             <option value="" style={{color: "#888"}}>세트 선택</option>
-            <option value="set1">애국가 (1~4절) [난이도 ⭐]</option>
-            <option value="set2">인공지능대학 소개글 [난이도 ⭐⭐]</option>
-            <option value="set3">이누공 [난이도 ⭐⭐⭐]</option>
+            <option value="set1">애국가 (1~4절) ★</option>
+            <option value="set2">인공지능대학 소개글 ★★</option>
+            <option value="set3">이누공 ★★★</option>
           </select>
         </div>
 
